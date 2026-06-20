@@ -1,6 +1,95 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+export interface ColumnStat {
+  name: string
+  count: number
+  missing_count: number
+  missing_percent: number
+  mean: number | null
+  median: number | null
+  std: number | null
+  min: number | null
+  max: number | null
+  outlier_count: number | null
+  outlier_percent: number | null
+}
+
+export interface StatsSummary {
+  columns: ColumnStat[]
+  total_rows: number
+  total_missing: number
+  total_missing_percent: number
+  total_outliers: number
+  total_outlier_percent: number
+}
+
+export interface HistogramData {
+  labels: string[]
+  values: number[]
+}
+
+export interface BoxplotData {
+  min: number
+  q1: number
+  median: number
+  q3: number
+  max: number
+  lower_whisker: number
+  upper_whisker: number
+}
+
+export interface MissingReportColumn {
+  name: string
+  missing_before: number
+  missing_after: number
+  missing_percent_before: number
+  missing_percent_after: number
+}
+
+export interface MissingReport {
+  total_missing_before: number
+  total_missing_after: number
+  missing_method: string
+  columns: MissingReportColumn[]
+}
+
+export interface OutlierReportColumn {
+  name: string
+  outliers_before: number
+  outliers_after: number
+  outlier_percent_before: number
+  outlier_percent_after: number
+}
+
+export interface OutlierReport {
+  total_outliers_before: number
+  total_outliers_after: number
+  outlier_method: string
+  outlier_threshold: number
+  outlier_action: string
+  columns: OutlierReportColumn[]
+}
+
+export interface DataCleaningResult {
+  before: {
+    stats: StatsSummary
+    histograms: Record<string, HistogramData>
+    boxplots: Record<string, BoxplotData>
+    data_preview: any[][]
+  }
+  after: {
+    stats: StatsSummary
+    histograms: Record<string, HistogramData>
+    boxplots: Record<string, BoxplotData>
+    data_preview: any[][]
+  }
+  missing_report: MissingReport
+  outlier_report: OutlierReport
+  processed_data: any[][]
+  columns: string[]
+}
+
 export interface MCScenario {
   id: string
   name: string
@@ -113,6 +202,64 @@ export const useMCStore = defineStore('mc', () => {
   const testResult = ref<HypTestResult | null>(null)
   const isRunning = ref(false)
 
+  const cleaningResult = ref<DataCleaningResult | null>(null)
+  const isCleaning = ref(false)
+  const selectedChartColumn = ref<string>('')
+  const showDataCleaner = ref(false)
+
+  const API_BASE = 'http://localhost:8000'
+
+  async function loadSampleData() {
+    try {
+      const response = await fetch(`${API_BASE}/api/data-cleaning/sample-data`)
+      return await response.json()
+    } catch (error) {
+      console.error('Failed to load sample data:', error)
+      return null
+    }
+  }
+
+  async function runDataCleaning(data: any[][], columns: string[], options: {
+    missing_value_method: string
+    outlier_method: string
+    outlier_threshold: number
+    outlier_action: string
+  }) {
+    isCleaning.value = true
+    try {
+      const response = await fetch(`${API_BASE}/api/data-cleaning/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data,
+          columns,
+          missing_value_method: options.missing_value_method,
+          outlier_method: options.outlier_method,
+          outlier_threshold: options.outlier_threshold,
+          outlier_action: options.outlier_action
+        })
+      })
+      cleaningResult.value = await response.json()
+      if (cleaningResult.value && cleaningResult.value.columns.length > 0) {
+        selectedChartColumn.value = cleaningResult.value.columns[0]
+      }
+      return cleaningResult.value
+    } catch (error) {
+      console.error('Data cleaning failed:', error)
+      return null
+    } finally {
+      isCleaning.value = false
+    }
+  }
+
+  function setShowDataCleaner(show: boolean) {
+    showDataCleaner.value = show
+  }
+
+  function setSelectedChartColumn(column: string) {
+    selectedChartColumn.value = column
+  }
+
   function runSimulation() {
     isRunning.value = true
     setTimeout(() => { result.value = runMC(currentScenario.value, iterations.value); isRunning.value = false }, 10)
@@ -148,5 +295,11 @@ export const useMCStore = defineStore('mc', () => {
     return { xAxis: Array.from({ length: bins }, (_, i) => Math.round((mn + i * bs) * 100) / 100), data: counts }
   })
 
-  return { currentScenario, iterations, result, testResult, isRunning, convergenceData, histogramData, runSimulation, runTest, setScenario }
+  return {
+    currentScenario, iterations, result, testResult, isRunning,
+    cleaningResult, isCleaning, selectedChartColumn, showDataCleaner,
+    convergenceData, histogramData,
+    runSimulation, runTest, setScenario,
+    loadSampleData, runDataCleaning, setShowDataCleaner, setSelectedChartColumn
+  }
 })

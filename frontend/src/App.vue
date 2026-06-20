@@ -1,8 +1,15 @@
 <template>
   <div class="min-h-screen bg-slate-900 text-slate-200">
-    <header class="border-b border-slate-700 px-6 py-4">
-      <h1 class="text-2xl font-bold text-cyan-400">蒙特卡洛模拟与统计假设检验平台</h1>
-      <p class="text-sm text-slate-500 mt-1">随机采样模拟 · 6种MC场景 · 假设检验 · 置信区间可视化</p>
+    <DataCleaner v-if="store.showDataCleaner" @close="store.setShowDataCleaner(false)" />
+    <template v-else>
+    <header class="border-b border-slate-700 px-6 py-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-2xl font-bold text-cyan-400">蒙特卡洛模拟与统计假设检验平台</h1>
+        <p class="text-sm text-slate-500 mt-1">随机采样模拟 · 6种MC场景 · 假设检验 · 置信区间可视化</p>
+      </div>
+      <button @click="store.setShowDataCleaner(true)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-bold">
+        🧹 数据清洗助手
+      </button>
     </header>
     <div class="flex flex-col lg:flex-row gap-4 p-4">
       <div class="lg:w-1/4 space-y-4">
@@ -65,6 +72,7 @@
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -72,6 +80,7 @@
 import { ref, watch, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import { useMCStore, SCENARIOS } from './store/mc'
+import DataCleaner from './components/DataCleaner.vue'
 
 const store = useMCStore()
 const convergenceRef = ref<HTMLDivElement | null>(null)
